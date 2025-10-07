@@ -1,0 +1,82 @@
+# Defects4J Configuration
+
+# Path configurations
+defects4j_home: "${DEFECTS4J_HOME:-/path/to/defects4j}"
+workspace_dir: "${WORKSPACE_DIR:-./data/defects4j/workspace}"
+output_dir: "${OUTPUT_DIR:-./data/results}"
+
+# Project selection
+projects:
+  - name: "Chart"
+    versions: [1, 26]
+    
+  - name: "Closure"
+    versions: [1, 133]
+    
+  - name: "Lang"
+    versions: [1, 65]
+    
+  - name: "Math"
+    versions: [1, 106]
+    
+  - name: "Mockito"
+    versions: [1, 38]
+    
+  - name: "Time"
+    versions: [1, 27]
+
+# Test generation settings
+test_generation:
+  timeout_per_test: 300  # seconds
+  max_tests_per_project: 100
+  test_output_dir: "${TEST_OUTPUT_DIR:-./data/generated_tests}"
+  
+# Bug analysis settings
+bug_analysis:
+  extract_fix_patch: true
+  extract_failing_tests: true
+  extract_coverage: true
+  coverage_tool: "cobertura"  # Options: cobertura, jacoco, jacoco-xml
+  
+# Execution settings
+execution:
+  java_home: "${JAVA_HOME:-/usr/lib/jvm/java-11-openjdk}"
+  jvm_args: "-Xmx4g -Xms1g"
+  parallel_execution: true
+  max_parallel_processes: 4
+  
+# Logging and output
+logging:
+  level: "INFO"
+  log_dir: "${LOG_DIR:-./logs}"
+  console_output: true
+  
+# Caching
+caching:
+  enabled: true
+  cache_dir: "${CACHE_DIR:-./.cache/defects4j}"
+  ttl_hours: 24
+  
+# Validation settings
+validation:
+  validate_failing_tests: true
+  validate_patch_application: true
+  validate_test_execution: true
+  
+# Advanced settings
+advanced:
+  keep_workspace: false
+  cleanup_on_failure: true
+  debug_mode: false
+  
+# Custom hooks (optional)
+hooks:
+  pre_checkout: ""  # Command to run before checking out a project
+  post_checkout: ""  # Command to run after checking out a project
+  pre_build: ""      # Command to run before building a project
+  post_build: ""     # Command to run after building a project
+  
+# Environment variables to pass to the build process
+environment:
+  MAVEN_OPTS: "-Xmx4g -Xms1g"
+  GRADLE_OPTS: "-Xmx4g -Xms1g"

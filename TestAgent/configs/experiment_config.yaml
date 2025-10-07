@@ -1,0 +1,30 @@
+defects4j:
+  projects:
+    - Lang
+    - Chart
+    - Time
+    - Math
+    - Closure
+    - Mockito
+  max_bugs_per_project: 50  # Set to null for all bugs
+  timeout_per_bug: 300  # seconds
+
+evaluation:
+  metrics:
+    - test_coverage
+    - mutation_score
+    - generation_time
+    - patch_effectiveness
+    - regression_detection
+    - false_positive_rate
+  
+baselines:
+  - name: "EvoSuite"
+    command: "evosuite"
+  - name: "Randoop"
+    command: "randoop"
+
+output:
+  results_dir: "./data/results"
+  figures_dir: "./data/figures"
+  logs_dir: "./data/logs"

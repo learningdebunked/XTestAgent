@@ -1,0 +1,62 @@
+# Core Dependencies
+python>=3.10
+torch==2.1.0
+transformers==4.35.0
+sentence-transformers==2.2.2
+
+# LLM and API
+openai==1.3.0
+anthropic==0.7.0
+langchain==0.1.0
+langchain-community==0.0.10
+
+# Reinforcement Learning
+gym==0.26.2
+stable-baselines3==2.1.0
+ray[rllib]==2.8.0
+
+# Graph Processing
+networkx==3.2
+neo4j==5.14.0
+torch-geometric==2.4.0
+
+# Java/Code Analysis
+javalang==0.13.0
+tree-sitter==0.20.4
+tree-sitter-java==0.20.2
+
+# Testing Tools
+pytest==7.4.3
+coverage==7.3.2
+pytest-cov==4.1.0
+
+# Code Coverage
+jacoco-python==0.1.0
+
+# Fuzzy Logic
+scikit-fuzzy==0.4.2
+
+# Data Processing
+pandas==2.1.3
+numpy==1.24.3
+scipy==1.11.4
+
+# Visualization
+matplotlib==3.8.2
+seaborn==0.13.0
+plotly==5.18.0
+
+# Utilities
+pyyaml==6.0.1
+python-dotenv==1.0.0
+tqdm==4.66.1
+loguru==0.7.2
+
+# Explainability
+shap==0.43.0
+lime==0.2.0.1
+
+# Development
+black==23.11.0
+flake8==6.1.0
+mypy==1.7.1

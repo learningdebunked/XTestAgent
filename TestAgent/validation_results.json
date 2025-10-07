@@ -1,0 +1,171 @@
+{
+  "equations": [
+    {
+      "equation": 1,
+      "description": "Code encoding (s_vec_i = Encoder_Code(s_i))",
+      "success": false,
+      "message": "Equation 1: Error checking implementation: No module named 'layer1_preprocessing'"
+    },
+    {
+      "equation": 2,
+      "description": "Semantic diff (Delta_sem = Encoder_Code(P_f) - Encoder_Code(P_b))",
+      "success": false,
+      "message": "Equation 2: Error checking implementation: No module named 'layer1_preprocessing'"
+    },
+    {
+      "equation": 3,
+      "description": "LLM test generation (T_gen = LLM_test(s_vec_i, M, Delta_sem))",
+      "success": false,
+      "message": "Equation 3: Error checking implementation: No module named 'layer2_test_generation'"
+    },
+    {
+      "equation": 4,
+      "description": "Fault detection potential (FDP(t_j) = E[CoverageGain(t_j) + CrashLikelihood(t_j)])",
+      "success": false,
+      "message": "Equation 4: Error checking implementation: No module named 'layer2_test_generation'"
+    },
+    {
+      "equation": 5,
+      "description": "RL reward function (R = \u03b1 * MutationScore(T) + \u03b2 * BranchCoverage(T))",
+      "success": false,
+      "message": "Equation 5: Error checking implementation: No module named 'layer2_test_generation'"
+    },
+    {
+      "equation": 6,
+      "description": "Contextual relevance score (CRS(O_b, O_f) = Sim_sem(O_b, O_f) / MaxSim)",
+      "success": false,
+      "message": "Equation 6: Error checking implementation: No module named 'layer3_fuzzy_validation'"
+    },
+    {
+      "equation": 7,
+      "description": "Confidence labeling (y_hat_t = sigmoid(W^T * o_vec_t + b))",
+      "success": false,
+      "message": "Equation 7: Error checking implementation: No module named 'layer3_fuzzy_validation'"
+    },
+    {
+      "equation": 8,
+      "description": "Patch differentiation (Delta_trace = Trace(P_f, t_j) - Trace(P_b, t_j))",
+      "success": false,
+      "message": "Equation 8: Error checking implementation: No module named 'layer4_patch_regression'"
+    },
+    {
+      "equation": 9,
+      "description": "Regression test selection (T_reg = argmax Sim_graph(C_new, t_k))",
+      "success": false,
+      "message": "Equation 9: Error checking implementation: No module named 'layer4_patch_regression'"
+    },
+    {
+      "equation": 10,
+      "description": "Utility function (U = \u03bb1 * Cov + \u03bb2 * FDR - \u03bb3 * Cost)",
+      "success": false,
+      "message": "Equation 10: Error checking implementation: No module named 'layer5_knowledge_graph'"
+    }
+  ],
+  "layers": [
+    {
+      "layer": "layer1_preprocessing",
+      "success": true,
+      "message": "Layer layer1_preprocessing: \u2713"
+    },
+    {
+      "layer": "layer2_test_generation",
+      "success": true,
+      "message": "Layer layer2_test_generation: \u2713"
+    },
+    {
+      "layer": "layer3_fuzzy_validation",
+      "success": true,
+      "message": "Layer layer3_fuzzy_validation: \u2713"
+    },
+    {
+      "layer": "layer4_patch_regression",
+      "success": true,
+      "message": "Layer layer4_patch_regression: \u2713"
+    },
+    {
+      "layer": "layer5_knowledge_graph",
+      "success": true,
+      "message": "Layer layer5_knowledge_graph: \u2713"
+    }
+  ],
+  "agents": [
+    {
+      "agent": "Defects4JLoader",
+      "success": false,
+      "message": "Agent Defects4JLoader: Error during validation: No module named 'layer1_preprocessing'"
+    },
+    {
+      "agent": "ASTCFGGenerator",
+      "success": false,
+      "message": "Agent ASTCFGGenerator: Error during validation: No module named 'layer1_preprocessing'"
+    },
+    {
+      "agent": "CodeEncoder",
+      "success": false,
+      "message": "Agent CodeEncoder: Error during validation: No module named 'layer1_preprocessing'"
+    },
+    {
+      "agent": "SemanticDiffAnalyzer",
+      "success": false,
+      "message": "Agent SemanticDiffAnalyzer: Error during validation: No module named 'layer1_preprocessing'"
+    },
+    {
+      "agent": "LLMTestGenerationAgent",
+      "success": false,
+      "message": "Agent LLMTestGenerationAgent: Error during validation: No module named 'layer2_test_generation'"
+    },
+    {
+      "agent": "RLPrioritizationAgent",
+      "success": false,
+      "message": "Agent RLPrioritizationAgent: Error during validation: No module named 'layer2_test_generation'"
+    },
+    {
+      "agent": "FuzzyAssertionAgent",
+      "success": false,
+      "message": "Agent FuzzyAssertionAgent: Error during validation: No module named 'layer3_fuzzy_validation'"
+    },
+    {
+      "agent": "PatchVerificationAgent",
+      "success": false,
+      "message": "Agent PatchVerificationAgent: Error during validation: No module named 'layer4_patch_regression'"
+    },
+    {
+      "agent": "RegressionSentinelAgent",
+      "success": false,
+      "message": "Agent RegressionSentinelAgent: Error during validation: No module named 'layer4_patch_regression'"
+    },
+    {
+      "agent": "KnowledgeGraphConstructor",
+      "success": false,
+      "message": "Agent KnowledgeGraphConstructor: Error during validation: No module named 'layer5_knowledge_graph'"
+    }
+  ],
+  "integration": [
+    {
+      "component": "Defects4J",
+      "success": false,
+      "message": "Defects4J integration error: No module named 'layer1_preprocessing'"
+    }
+  ],
+  "metrics": [
+    {
+      "component": "Metrics",
+      "success": false,
+      "message": "Error checking evaluation metrics: No module named 'evaluation.metrics_calculator'"
+    }
+  ],
+  "figures": [
+    {
+      "component": "Figures",
+      "success": false,
+      "message": "Error generating figures: No module named 'evaluation.visualizations'"
+    }
+  ],
+  "documentation": [
+    {
+      "component": "Documentation",
+      "success": false,
+      "message": "Documentation: Missing files: docs/API.md, docs/DEVELOPMENT.md"
+    }
+  ]
+}
