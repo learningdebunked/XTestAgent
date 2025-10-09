@@ -15,42 +15,56 @@ import json
 import tempfile
 import shutil
 
-from ..layer1_preprocessing.ast_cfg_generator import ASTCFGGenerator
+from testagentx.layer1_preprocessing.ast_cfg_generator import ASTCFGGenerator
 
 @dataclass
 class ExecutionTrace:
-    """Represents execution trace of a test case."""
-    test_id: str
-    covered_lines: List[int]
-    branch_coverage: Dict[Tuple[int, int], bool]  # (src_line, dst_line) -> covered
+    """Represents execution trace of a test case.
+    
+    Attributes:
+        method_calls: List of method calls made during execution
+        line_coverage: List of line numbers that were executed
+        branch_decisions: List of tuples (line_number, decision) for branch coverage
+        exceptions: List of exceptions that occurred during execution
+    """
     method_calls: List[str]
-    execution_time: float  # in seconds
-    memory_usage: float    # in MB
+    line_coverage: List[int]
+    branch_decisions: List[Tuple[int, bool]]
+    exceptions: List[str]
     
-    def to_dict(self) -> Dict[str, Any]:
-        """Convert trace to dictionary for serialization."""
-        return {
-            'test_id': self.test_id,
-            'covered_lines': self.covered_lines,
-            'branch_coverage': {f"{src}-{dst}": covered 
-                              for (src, dst), covered in self.branch_coverage.items()},
-            'method_calls': self.method_calls,
-            'execution_time': self.execution_time,
-            'memory_usage': self.memory_usage
-        }
-    
-    @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'ExecutionTrace':
-        """Create ExecutionTrace from dictionary."""
-        return cls(
-            test_id=data['test_id'],
-            covered_lines=data['covered_lines'],
-            branch_coverage={tuple(map(int, k.split('-'))): v 
-                           for k, v in data['branch_coverage'].items()},
-            method_calls=data['method_calls'],
-            execution_time=data['execution_time'],
-            memory_usage=data['memory_usage']
-        )
+    def to_vector(self) -> np.ndarray:
+        """Convert the execution trace to a numerical vector.
+        
+        Returns:
+            A numpy array representing the execution trace
+        """
+        # Convert method calls to one-hot encoding
+        method_vector = np.zeros(100)  # Assuming max 100 unique methods
+        for method in self.method_calls:
+            method_id = hash(method) % 100
+            method_vector[method_id] += 1
+            
+        # Convert line coverage to binary vector
+        max_line = max(self.line_coverage) if self.line_coverage else 0
+        line_vector = np.zeros(max_line + 1)
+        for line in self.line_coverage:
+            line_vector[line] = 1
+            
+        # Convert branch decisions to binary vector
+        branch_vector = np.zeros(2)  # [taken, not_taken]
+        for _, decision in self.branch_decisions:
+            if decision:
+                branch_vector[0] += 1
+            else:
+                branch_vector[1] += 1
+                
+        # Combine all features
+        return np.concatenate([
+            method_vector,
+            line_vector,
+            branch_vector,
+            [len(self.exceptions)]  # Number of exceptions
+        ])
 
 @dataclass
 class PatchVerificationResult:
@@ -76,20 +90,22 @@ class PatchVerificationAgent:
     Agent responsible for verifying the effectiveness of patches by comparing
     execution traces between buggy and patched code versions.
     
-    Implements Equation (8) from the paper:
-    Δ_trace = Trace(P_f, t_j) - Trace(P_b, t_j)
+    Implements the verification process using execution trace comparison:
+    Δ_trace = Trace(patched_code, test) - Trace(original_code, test)
     """
     
-    def __init__(self, config: Optional[Dict[str, Any]] = None):
+    def __init__(self, epsilon: float = 0.1, config: Optional[Dict[str, Any]] = None):
         """Initialize the PatchVerificationAgent.
         
         Args:
+            epsilon: Threshold for considering traces as different (default: 0.1)
             config: Configuration dictionary with optional parameters:
                 - jacoco_path: Path to JaCoCo agent JAR
                 - java_home: Path to Java home directory
                 - timeout_seconds: Test execution timeout in seconds
                 - memory_limit_mb: Memory limit in MB for test execution
         """
+        self.epsilon = epsilon
         self.config = config or {}
         self.logger = logging.getLogger(__name__)
         self.ast_cfg_generator = ASTCFGGenerator()
@@ -99,6 +115,9 @@ class PatchVerificationAgent:
         self.java_home = self.config.get('java_home', '/usr/lib/jvm/default-java')
         self.timeout_seconds = self.config.get('timeout_seconds', 300)
         self.memory_limit_mb = self.config.get('memory_limit_mb', 4096)
+        
+        # Cache for execution traces
+        self._trace_cache = {}
         
         # Ensure JaCoCo agent exists
         if not Path(self.jacoco_agent).exists():

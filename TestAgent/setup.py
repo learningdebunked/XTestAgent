@@ -3,8 +3,8 @@ from setuptools import setup, find_packages
 setup(
     name="testagentx",
     version="0.1.0",
-    packages=find_packages(where="src") + ['evaluation'],
-    package_dir={"": "src", "evaluation": "src/evaluation"},
+    package_dir={"": "src"},
+    packages=find_packages(where="src"),
     install_requires=[
         # Core Dependencies
         "numpy>=1.21.0",

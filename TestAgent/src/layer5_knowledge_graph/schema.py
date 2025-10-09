@@ -3,21 +3,98 @@ Knowledge Graph Schema Definition for TestAgentX.
 
 Defines the node types, relationships, and constraints for the Neo4j knowledge graph.
 """
-from enum import Enum
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
 from datetime import datetime
 
 
-class NodeType(str, Enum):
-    """Types of nodes in the knowledge graph."""
-    METHOD = "Method"
-    CLASS = "Class"
-    TEST = "Test"
-    BUG = "Bug"
+class RelationshipType(str, Enum):
+    """Types of relationships in the knowledge graph."""
+    # Structural Relationships
+    CONTAINS = "CONTAINS"  # Parent-child relationships (e.g., class contains methods)
+    DECLARES = "DECLARES"  # File declares class/interface
+    IMPORTS = "IMPORTS"    # File/class imports another
+    
+    # Code Relationships
+    CALLS = "CALLS"                # Method calls another method
+    OVERRIDES = "OVERRIDES"        # Method overrides a parent class method
+    IMPLEMENTS = "IMPLEMENTS"      # Class implements an interface
+    EXTENDS = "EXTENDS"            # Class extends another class
+    ANNOTATED_WITH = "ANNOTATED_WITH"  # Code element has an annotation
+    THROWS = "THROWS"              # Method can throw exception
+    RETURNS = "RETURNS"            # Method return type
+    HAS_PARAMETER = "HAS_PARAMETER"  # Method has parameter
+    
+    # Testing Relationships
+    TESTS = "TESTS"                # Test verifies functionality
+    COVERS = "COVERS"              # Test covers code element
+    VERIFIES = "VERIFIES"          # Test verifies requirement
+    MOCKS = "MOCKS"                # Test mocks a component
+    USES_TEST_DATA = "USES_TEST_DATA"  # Test uses specific test data
+    HAS_TEST_CASE = "HAS_TEST_CASE"    # Test suite contains test cases
+    
+    # Issue Tracking
+    FIXES = "FIXES"                # Fixes a bug/issue
+    INTRODUCES = "INTRODUCES"      # Introduced a bug/regression
+    AFFECTS = "AFFECTS"            # Bug affects component
+    BLOCKS = "BLOCKS"              # Issue blocks another
+    DUPLICATES = "DUPLICATES"      # Issue is duplicate of another
+    RELATED_TO = "RELATED_TO"      # Related issues
+    
+    # Dependencies
+    DEPENDS_ON = "DEPENDS_ON"      # Component depends on another
+    USES = "USES"                  # Component uses another
+    EXTENDED_BY = "EXTENDED_BY"    # Reverse of EXTENDS
+    IMPLEMENTED_BY = "IMPLEMENTED_BY"  # Reverse of IMPLEMENTS
+    
+    # Version Control
+    COMMITTED_IN = "COMMITTED_IN"  # Code change in commit
+    AFFECTED_BY = "AFFECTED_BY"    # Component affected by commit
+    MERGED_INTO = "MERGED_INTO"   # PR merged into branch
+    
+    # People and Teams
+    AUTHORED_BY = "AUTHORED_BY"    # Code/test authored by developer
+    REVIEWED_BY = "REVIEWED_BY"    # Code reviewed by
+    OWNS = "OWNS"                  # Team owns component
+    
+    # Documentation
+    DOCUMENTS = "DOCUMENTS"        # Documents a code element
+    REFERENCES = "REFERENCES"       # References another element
+    
+    # Semantic Relationships
+    SIMILAR_TO = "SIMILAR_TO"      # Similar components
+    CO_OCCURS_WITH = "CO_OCCURS_WITH"  # Frequently co-occurs with
+    
+    # Impact Analysis
+    IMPACTS = "IMPACTS"            # Component impacts another
+    AFFECTED_BY = "AFFECTED_BY"    # Component is affected by another
+    
+    # Version Control
+    COMMIT = "Commit"
+    BRANCH = "Branch"
+    PULL_REQUEST = "PullRequest"
+    
+    # Project Structure
     FILE = "File"
+    DIRECTORY = "Directory"
     PACKAGE = "Package"
-    TEST_CASE = "TestCase"
+    MODULE = "Module"
+    
+    # People and Teams
+    DEVELOPER = "Developer"
+    TEAM = "Team"
+    
+    # Build and Dependencies
+    DEPENDENCY = "Dependency"
+    LIBRARY = "Library"
+    
+    # Documentation
+    DOCUMENT = "Document"
+    API_DOC = "ApiDoc"
+    
+    # Metrics and Quality
+    METRIC = "Metric"
+    CODE_QUALITY_ISSUE = "CodeQualityIssue"
 
 
 class RelationshipType(str, Enum):

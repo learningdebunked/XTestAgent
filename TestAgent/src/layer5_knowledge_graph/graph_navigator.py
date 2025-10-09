@@ -501,21 +501,6 @@ class GraphNavigator:
         self._update_target_network()
     
     def _update_target_network(self) -> None:
-        """Update the target network with weights from the Q-network."""
-        self.target_network.load_state_dict(self.q_network.state_dict())
-    
-    # Graph Analysis Methods
-    
-    def analyze_impact(self, node_id: int, max_depth: int = 3) -> Dict[str, Any]:
-        """Analyze the impact of a node on the graph."""
-        if not self.graph_constructor.driver:
-            self.logger.error("Database connection not established")
-            return {}
-            
-        with self.graph_constructor.driver.session(database=self.graph_constructor.database) as session:
-            try:
-                # Get all nodes reachable from this node within max_depth
-                query = f"""
                 MATCH (start) WHERE id(start) = $node_id
                 CALL apoc.path.subgraphNodes(start, {{
                     relationshipFilter: ">",

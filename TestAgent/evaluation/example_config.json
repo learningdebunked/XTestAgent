@@ -1,0 +1,12 @@
+{
+  "project_name": "example_project",
+  "target_classes": [
+    "com.example.ExampleClass1",
+    "com.example.ExampleClass2"
+  ],
+  "classpath": "/path/to/project/classpath:/path/to/dependencies/*",
+  "time_budget": 300,
+  "seed": 42,
+  "output_dir": "experiment_results",
+  "tools": ["testagentx", "evosuite", "randoop"]
+}
