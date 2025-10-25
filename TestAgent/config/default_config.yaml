@@ -1,0 +1,170 @@
+# TestAgentX Default Configuration
+# All hardcoded constants are now configurable
+
+# Code Encoder Configuration (Layer 1)
+code_encoder:
+  model_name: "microsoft/codebert-base"
+  embedding_dim: 768
+  max_sequence_length: 512
+  batch_size: 32
+  device: "auto"  # auto, cuda, cpu
+
+# Test Generation Configuration (Layer 2)
+test_generation:
+  llm:
+    model_name: "gpt-4"
+    temperature: 0.7
+    max_tokens: 2048
+    top_p: 0.95
+  
+  rl_prioritization:
+    embedding_dim: 128
+    learning_rate: 0.001
+    gamma: 0.99
+    epsilon_start: 1.0
+    epsilon_min: 0.01
+    epsilon_decay: 0.995
+    memory_size: 10000
+    batch_size: 64
+    hidden_dim: 256
+    num_layers: 3
+  
+  num_tests_per_method: 5
+  max_retries: 3
+  timeout_seconds: 300
+
+# Fuzzy Validation Configuration (Layer 3)
+fuzzy_validation:
+  model_name: "all-mpnet-base-v2"
+  threshold: 0.7
+  max_sim: 1.0
+  confidence_threshold: 0.6
+  semantic_weight: 0.7
+  contextual_weight: 0.3
+
+# Patch Verification Configuration (Layer 4)
+patch_verification:
+  epsilon: 0.1  # Trace difference threshold
+  jacoco_agent: "lib/jacocoagent.jar"
+  jacoco_cli: "lib/jacococli.jar"
+  java_home: "/usr/lib/jvm/default-java"
+  timeout_seconds: 300
+  memory_limit_mb: 4096
+  max_trace_size: 10000
+  
+  # Effectiveness scoring weights (Equation 8)
+  weights:
+    line_coverage: 0.3
+    branch_coverage: 0.3
+    method_calls: 0.2
+    exceptions: 0.2
+
+# Knowledge Graph Configuration (Layer 5)
+knowledge_graph:
+  neo4j:
+    uri: "bolt://localhost:7687"
+    user: "neo4j"
+    password: "password"
+    database: "neo4j"
+  
+  rl_navigation:
+    embedding_dim: 128
+    learning_rate: 0.001
+    gamma: 0.99
+    epsilon: 1.0
+    epsilon_min: 0.01
+    epsilon_decay: 0.995
+    memory_size: 10000
+    batch_size: 64
+    max_steps: 20
+    
+  gat_network:
+    hidden_dim: 128
+    num_heads: 4
+    dropout: 0.2
+
+# Mutation Testing Configuration
+mutation_testing:
+  timeout_seconds: 60
+  max_mutants_per_file: 100
+  operators:
+    - AOR  # Arithmetic Operator Replacement
+    - ROR  # Relational Operator Replacement
+    - COR  # Conditional Operator Replacement
+    - UOI  # Unary Operator Insertion
+    - SDL  # Statement Deletion
+    - CRP  # Constant Replacement
+    - RVR  # Return Value Replacement
+    - NMR  # Null Mutation Replacement
+    - BVA  # Boundary Value Adjustment
+
+# Chaos Engineering Configuration
+chaos_engineering:
+  scenarios:
+    network_latency:
+      enabled: true
+      min_latency_ms: 500
+      max_latency_ms: 2000
+      probability: 0.3
+    
+    cpu_stress:
+      enabled: true
+      cpu_percentage: 90
+      cores: 2
+      probability: 0.25
+    
+    memory_leak:
+      enabled: true
+      memory_mb: 512
+      rate_mb_per_sec: 10
+      probability: 0.15
+
+# Evaluation Metrics Configuration
+evaluation:
+  # Paper claim targets
+  targets:
+    test_coverage: 89.0
+    mutation_score: 84.0
+    time_reduction: 55.0
+    patch_accuracy: 91.0
+    false_positive_rate: 8.0
+    developer_acceptance: 82.0
+  
+  # Measurement settings
+  coverage:
+    jacoco_cli: "lib/jacococli.jar"
+    report_format: "XML"
+  
+  mutation:
+    pitest_jar: "lib/pitest.jar"
+    timeout_factor: 1.5
+  
+  performance:
+    num_iterations: 10
+    warmup_iterations: 2
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: "logs/testagentx.log"
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# Paths Configuration
+paths:
+  models: "models/"
+  data: "data/"
+  results: "results/"
+  cache: "cache/"
+  logs: "logs/"
+
+# Feature Flags
+features:
+  enable_rl_prioritization: true
+  enable_fuzzy_validation: true
+  enable_chaos_testing: false
+  enable_mutation_testing: true
+  enable_knowledge_graph: true
+  use_gpu: true
+  cache_embeddings: true
