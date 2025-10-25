@@ -10,6 +10,7 @@ import networkx as nx
 from neo4j import GraphDatabase, Driver, Session, Transaction, Result
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 from torch_geometric.data import Data, Batch
 from torch_geometric.nn import GATConv
@@ -128,8 +129,8 @@ class GraphNavigator:
                 # Build the relationship pattern
                 rel_pattern = ""
                 if rel_types:
-                    rel_types_str = "|%".join([rt.value for rt in rel_types])
-                    rel_pattern = f"[{rel_pattern}:"{rel_types_str}"]"
+                    rel_types_str = "|".join([rt.value for rt in rel_types])
+                    rel_pattern = f"[:{rel_types_str}]"
                 
                 # Build the direction part of the query
                 direction_map = {
@@ -500,13 +501,44 @@ class GraphNavigator:
         # Update target network
         self._update_target_network()
     
-    def _update_target_network(self) -> None:
+    def _update_target_network(self, tau: float = 0.001) -> None:
+        """Soft update of target network parameters.
+        
+        Args:
+            tau: Interpolation parameter for soft update
+        """
+        for target_param, param in zip(self.target_network.parameters(), 
+                                       self.q_network.parameters()):
+            target_param.data.copy_(tau * param.data + (1.0 - tau) * target_param.data)
+    
+    def analyze_impact(self, node_id: int, max_depth: int = 3) -> Dict[str, Any]:
+        """Analyze the impact of a node on the graph.
+        
+        Args:
+            node_id: ID of the node to analyze
+            max_depth: Maximum depth to traverse
+            
+        Returns:
+            Dictionary containing impact analysis
+        """
+        if not self.graph_constructor.driver:
+            self.logger.error("Database connection not established")
+            return {
+                "node_id": node_id,
+                "error": "No database connection",
+                "impacted_nodes": {},
+                "total_impacted": 0
+            }
+            
+        with self.graph_constructor.driver.session(database=self.graph_constructor.database) as session:
+            try:
+                query = """
                 MATCH (start) WHERE id(start) = $node_id
-                CALL apoc.path.subgraphNodes(start, {{
+                CALL apoc.path.subgraphNodes(start, {
                     relationshipFilter: ">",
                     minLevel: 1,
                     maxLevel: $max_depth
-                }}) YIELD node
+                }) YIELD node
                 WITH collect(DISTINCT node) as nodes
                 UNWIND nodes as n
                 WITH DISTINCT n, labels(n)[0] as type
@@ -543,6 +575,33 @@ class GraphNavigator:
                     "impacted_nodes": {},
                     "total_impacted": 0
                 }
+    
+    def save_model(self, path: str) -> None:
+        """Save the Q-network model.
+        
+        Args:
+            path: Path to save the model
+        """
+        torch.save({
+            'q_network_state_dict': self.q_network.state_dict(),
+            'target_network_state_dict': self.target_network.state_dict(),
+            'optimizer_state_dict': self.optimizer.state_dict(),
+            'epsilon': self.epsilon
+        }, path)
+        self.logger.info(f"Model saved to {path}")
+    
+    def load_model(self, path: str) -> None:
+        """Load the Q-network model.
+        
+        Args:
+            path: Path to load the model from
+        """
+        checkpoint = torch.load(path, map_location=self.device)
+        self.q_network.load_state_dict(checkpoint['q_network_state_dict'])
+        self.target_network.load_state_dict(checkpoint['target_network_state_dict'])
+        self.optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        self.epsilon = checkpoint['epsilon']
+        self.logger.info(f"Model loaded from {path}")
 
 
 class GATNetwork(nn.Module):
