@@ -1,5 +1,5 @@
 # Core Dependencies
-python>=3.10
+# Python 3.8+ required (not a pip package, check with: python --version)
 torch==2.1.0
 transformers==4.35.0
 sentence-transformers==2.2.2
@@ -22,16 +22,16 @@ torch-geometric==2.4.0
 
 # Java/Code Analysis
 javalang==0.13.0
-tree-sitter==0.20.4
-tree-sitter-java==0.20.2
+tree-sitter>=0.20.0
+tree-sitter-java>=0.21.0
 
 # Testing Tools
 pytest==7.4.3
 coverage==7.3.2
 pytest-cov==4.1.0
 
-# Code Coverage
-jacoco-python==0.1.0
+# Note: JaCoCo is a Java tool, installed separately via scripts/setup_jacoco.sh
+# No Python package needed
 
 # Fuzzy Logic
 scikit-fuzzy==0.4.2

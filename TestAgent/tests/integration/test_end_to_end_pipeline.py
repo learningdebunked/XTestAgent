@@ -10,6 +10,18 @@ import sys
 from pathlib import Path
 import tempfile
 import shutil
+import os
+
+# Fix for macOS multiprocessing issues with PyTorch
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+
+# Set multiprocessing start method to 'spawn' for macOS compatibility
+import multiprocessing
+try:
+    multiprocessing.set_start_method('spawn', force=True)
+except RuntimeError:
+    pass  # Already set
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent / 'src'))

@@ -38,15 +38,60 @@ TestAgent is a comprehensive framework for automated test generation and validat
 
 ## Quick Start
 
-1. Run the setup script to download dependencies:
+### Option 1: Simple Test (Fastest - Recommended for First Run)
+
+```bash
+# Run simple functionality test (no complex dependencies)
+python3 tests/simple_test.py
+```
+
+### Option 2: Quick Validation
+
+```bash
+# Make script executable
+chmod +x run_validation.sh
+
+# Run quick validation (integration tests)
+./run_validation.sh --quick
+```
+
+### Option 2: Full Validation
+
+```bash
+# Validate all paper claims
+./run_validation.sh /path/to/your/project
+
+# Or use Python directly
+python evaluation/run_full_evaluation.py \
+  --project /path/to/project \
+  --output evaluation_results/
+```
+
+### Option 3: Step-by-Step
+
+1. **Setup JaCoCo** (for coverage measurement):
    ```bash
-   bash scripts/setup_defects4j.sh
+   bash scripts/setup_jacoco.sh
    ```
 
-2. Run the test generation pipeline:
+2. **Run integration tests**:
    ```bash
-   python -m evaluation.run_experiments --config configs/experiment_config.yaml
+   python tests/integration/test_end_to_end_pipeline.py
    ```
+
+3. **Generate tests for a class**:
+   ```bash
+   python -m layer2_test_generation.llm_test_agent \
+     --source Calculator.java \
+     --output CalculatorTest.java
+   ```
+
+4. **Validate paper claims**:
+   ```bash
+   bash scripts/validate_claims.sh /path/to/project
+   ```
+
+For detailed instructions, see [QUICKSTART.md](QUICKSTART.md)
 
 ## Project Structure
 

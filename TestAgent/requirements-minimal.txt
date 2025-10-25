@@ -1,0 +1,21 @@
+# Minimal Requirements for Quick Testing
+# Python 3.8+ required
+
+# Core ML/DL (optional for basic testing)
+# torch>=2.0.0
+# transformers>=4.30.0
+
+# Testing
+pytest>=7.0.0
+coverage>=7.0.0
+
+# Utilities
+pyyaml>=6.0
+numpy>=1.24.0
+tqdm>=4.65.0
+
+# Java parsing (optional)
+# javalang>=0.13.0
+
+# For full functionality, use:
+# pip install -r requirements.txt
