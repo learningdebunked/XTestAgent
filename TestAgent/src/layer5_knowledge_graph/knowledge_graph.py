@@ -15,6 +15,9 @@ from pathlib import Path
 import json
 import uuid
 from datetime import datetime
+import ast
+import re
+import javalang
 
 from .graph_constructor import GraphConstructor
 from .graph_navigator import GraphNavigator
@@ -23,6 +26,7 @@ from .schema import (
     MethodNode, ClassNode, TestNode, BugNode, 
     FileNode, PackageNode, TestCaseNode, SchemaManager
 )
+from . import parser_helpers
 
 # Type aliases
 Node = Dict[str, Any]
@@ -259,25 +263,239 @@ class KnowledgeGraph:
         return language_map.get(extension.lower(), 'unknown')
     
     def _process_java_file(self, content: str, file_node: Dict[str, Any]) -> None:
-        """Process a Java source file and add its contents to the graph."""
-        # This would use a Java parser to extract classes, methods, etc.
-        # For now, we'll just create a placeholder
-        pass
+        """Process a Java source file and add its contents to the graph.
+        
+        Parses Java source code to extract:
+        - Package declarations
+        - Class definitions
+        - Method definitions
+        - Field declarations
+        - Relationships (inheritance, method calls)
+        
+        Args:
+            content: Java source code content
+            file_node: File node in the graph
+        """
+        try:
+            # Parse Java source code
+            tree = javalang.parse.parse(content)
+            
+            # Extract package name
+            package_name = tree.package.name if tree.package else ''
+            
+            # Create package node if it doesn't exist
+            if package_name:
+                package_node = self.constructor.create_node(
+                    NodeType.PACKAGE,
+                    {'name': package_name, 'id': f"package_{package_name}"}
+                )
+                
+                # Link file to package
+                self.constructor.create_relationship(
+                    file_node['id'],
+                    package_node['id'],
+                    RelationshipType.BELONGS_TO,
+                    {}
+                )
+            
+            # Process each class/interface/enum in the file
+            for path, node in tree.filter(javalang.tree.TypeDeclaration):
+                parser_helpers.process_java_class(self, node, file_node, package_name, content)
+                
+        except Exception as e:
+            self.logger.error(f"Error parsing Java file: {e}", exc_info=True)
     
     def _process_python_file(self, content: str, file_node: Dict[str, Any]) -> None:
-        """Process a Python source file and add its contents to the graph."""
-        # This would use the ast module to parse the Python file
-        pass
+        """Process a Python source file and add its contents to the graph.
+        
+        Parses Python source code using the ast module to extract:
+        - Module-level imports
+        - Class definitions
+        - Function/method definitions
+        - Decorators
+        
+        Args:
+            content: Python source code content
+            file_node: File node in the graph
+        """
+        try:
+            # Parse Python source code
+            tree = ast.parse(content)
+            
+            # Process each class in the file
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    parser_helpers.process_python_class(self, node, file_node, content)
+                elif isinstance(node, ast.FunctionDef) and node.col_offset == 0:
+                    # Top-level function (not a method)
+                    parser_helpers.process_python_function(self, node, file_node, content)
+                    
+        except SyntaxError as e:
+            self.logger.error(f"Syntax error parsing Python file: {e}")
+        except Exception as e:
+            self.logger.error(f"Error parsing Python file: {e}", exc_info=True)
     
     def _process_java_test_file(self, content: str, file_node: Dict[str, Any]) -> None:
-        """Process a Java test file and add test cases to the graph."""
-        # This would parse JUnit or TestNG test files
-        pass
+        """Process a Java test file and add test cases to the graph.
+        
+        Identifies JUnit/TestNG test methods and creates test nodes.
+        Detects:
+        - @Test annotated methods
+        - Test class structure
+        - Setup/teardown methods
+        - Test assertions
+        
+        Args:
+            content: Java test file content
+            file_node: File node in the graph
+        """
+        try:
+            # Parse Java test file
+            tree = javalang.parse.parse(content)
+            
+            # Extract package name
+            package_name = tree.package.name if tree.package else ''
+            
+            # Process test classes
+            for path, class_node in tree.filter(javalang.tree.ClassDeclaration):
+                class_name = class_node.name
+                
+                # Create class node
+                class_data = {
+                    'id': f"class_{package_name}.{class_name}",
+                    'name': class_name,
+                    'package': package_name,
+                    'is_abstract': 'abstract' in (class_node.modifiers or []),
+                    'is_interface': False,
+                    'is_enum': False,
+                    'superclass': class_node.extends.name if class_node.extends else None,
+                    'interfaces': [i.name for i in (class_node.implements or [])],
+                    'start_line': 0,
+                    'end_line': 0,
+                    'docstring': class_node.documentation or ''
+                }
+                
+                class_graph_node = self._create_class_node(class_data)
+                
+                # Link class to file
+                self.constructor.create_relationship(
+                    class_graph_node['id'],
+                    file_node['id'],
+                    RelationshipType.DEFINED_IN,
+                    {}
+                )
+                
+                # Process test methods
+                for method in class_node.methods:
+                    # Check if method has @Test annotation
+                    is_test = False
+                    framework = 'unknown'
+                    
+                    if method.annotations:
+                        for annotation in method.annotations:
+                            if annotation.name in ['Test', 'org.junit.Test', 'org.junit.jupiter.api.Test']:
+                                is_test = True
+                                framework = 'junit'
+                            elif annotation.name in ['org.testng.annotations.Test']:
+                                is_test = True
+                                framework = 'testng'
+                    
+                    if is_test:
+                        # Create test node
+                        test_data = {
+                            'id': f"test_{package_name}.{class_name}.{method.name}",
+                            'name': method.name,
+                            'file_path': file_node.get('path', ''),
+                            'framework': framework,
+                            'is_parameterized': any(a.name in ['ParameterizedTest', 'DataProvider'] 
+                                                   for a in (method.annotations or [])),
+                            'parameters': [p.name for p in (method.parameters or [])],
+                            'start_line': 0,
+                            'end_line': 0,
+                            'docstring': method.documentation or ''
+                        }
+                        
+                        test_node = self._create_test_node(test_data)
+                        
+                        # Link test to class
+                        self.constructor.create_relationship(
+                            test_node['id'],
+                            class_graph_node['id'],
+                            RelationshipType.BELONGS_TO,
+                            {}
+                        )
+                        
+        except Exception as e:
+            self.logger.error(f"Error parsing Java test file: {e}", exc_info=True)
     
     def _process_python_test_file(self, content: str, file_node: Dict[str, Any]) -> None:
-        """Process a Python test file and add test cases to the graph."""
-        # This would parse unittest or pytest test files
-        pass
+        """Process a Python test file and add test cases to the graph.
+        
+        Identifies unittest/pytest test methods and creates test nodes.
+        Detects:
+        - Test classes (inheriting from unittest.TestCase)
+        - Test functions (starting with 'test_')
+        - Pytest fixtures and markers
+        - Test assertions
+        
+        Args:
+            content: Python test file content
+            file_node: File node in the graph
+        """
+        try:
+            # Parse Python test file
+            tree = ast.parse(content)
+            
+            # Process test classes and functions
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    # Check if it's a test class
+                    is_test_class = (
+                        node.name.startswith('Test') or
+                        any(base.id == 'TestCase' if isinstance(base, ast.Name) else False 
+                            for base in node.bases)
+                    )
+                    
+                    if is_test_class:
+                        # Create class node
+                        class_data = {
+                            'id': f"class_{node.name}",
+                            'name': node.name,
+                            'package': '',
+                            'is_abstract': False,
+                            'is_interface': False,
+                            'is_enum': False,
+                            'superclass': node.bases[0].id if node.bases and isinstance(node.bases[0], ast.Name) else None,
+                            'interfaces': [],
+                            'start_line': node.lineno,
+                            'end_line': node.end_lineno or node.lineno,
+                            'docstring': ast.get_docstring(node) or ''
+                        }
+                        
+                        class_graph_node = self._create_class_node(class_data)
+                        
+                        # Link class to file
+                        self.constructor.create_relationship(
+                            class_graph_node['id'],
+                            file_node['id'],
+                            RelationshipType.DEFINED_IN,
+                            {}
+                        )
+                        
+                        # Process test methods in the class
+                        for item in node.body:
+                            if isinstance(item, ast.FunctionDef) and item.name.startswith('test_'):
+                                parser_helpers.create_python_test_node(self, item, class_graph_node, file_node)
+                                
+                elif isinstance(node, ast.FunctionDef) and node.col_offset == 0:
+                    # Top-level test function (pytest style)
+                    if node.name.startswith('test_'):
+                        parser_helpers.create_python_test_node(self, node, None, file_node)
+                        
+        except SyntaxError as e:
+            self.logger.error(f"Syntax error parsing Python test file: {e}")
+        except Exception as e:
+            self.logger.error(f"Error parsing Python test file: {e}", exc_info=True)
     
     # Node creation methods
     

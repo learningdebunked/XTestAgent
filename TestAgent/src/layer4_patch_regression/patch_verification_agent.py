@@ -31,11 +31,15 @@ class ExecutionTrace:
         line_coverage: List of line numbers that were executed
         branch_decisions: List of tuples (line_number, decision) for branch coverage
         exceptions: List of exceptions that occurred during execution
+        execution_time: Time taken to execute the test (seconds)
+        memory_usage: Memory used during test execution (MB)
     """
     method_calls: List[str]
     line_coverage: List[int]
     branch_decisions: List[Tuple[int, bool]]
     exceptions: List[str]
+    execution_time: float = 0.0
+    memory_usage: float = 0.0
     
     def to_vector(self) -> np.ndarray:
         """Convert the execution trace to a numerical vector.
@@ -212,6 +216,13 @@ class PatchVerificationAgent:
             ]
             
             try:
+                # Measure memory usage before test
+                process = psutil.Process(os.getpid())
+                mem_before = process.memory_info().rss / 1024 / 1024  # MB
+                
+                # Measure execution time
+                start_time = time.time()
+                
                 # Run test and capture output
                 result = subprocess.run(
                     cmd,
@@ -221,22 +232,15 @@ class PatchVerificationAgent:
                     timeout=self.timeout_seconds
                 )
                 
-                # Measure execution time
-                start_time = time.time()
-                
-                # Measure memory usage before test
-                process = psutil.Process(os.getpid())
-                mem_before = process.memory_info().rss / 1024 / 1024  # MB
-                
-                # Parse JaCoCo report
-                coverage = self._parse_jacoco_report(jacoco_output)
+                # Calculate execution time
+                exec_time = time.time() - start_time
                 
                 # Measure memory usage after test
                 mem_after = process.memory_info().rss / 1024 / 1024  # MB
                 mem_used = max(0, mem_after - mem_before)
                 
-                # Calculate execution time
-                exec_time = time.time() - start_time
+                # Parse JaCoCo report
+                coverage = self._parse_jacoco_report(jacoco_output)
                 
                 # Extract method calls from output
                 method_calls = self._extract_method_calls(result.stdout + result.stderr)
@@ -246,7 +250,9 @@ class PatchVerificationAgent:
                     method_calls=method_calls,
                     line_coverage=coverage.get('line_coverage', []),
                     branch_decisions=self._extract_branch_decisions(coverage.get('branch_coverage', {})),
-                    exceptions=self._extract_exceptions(result.stdout + result.stderr)
+                    exceptions=self._extract_exceptions(result.stdout + result.stderr),
+                    execution_time=exec_time,
+                    memory_usage=mem_used
                 )
                 
                 traces[test_id] = trace
@@ -293,12 +299,12 @@ class PatchVerificationAgent:
             patched = patched_traces[test_id]
             
             # Calculate line coverage differences
-            buggy_lines = set(buggy.covered_lines)
-            patched_lines = set(patched.covered_lines)
+            buggy_lines = set(buggy.line_coverage)
+            patched_lines = set(patched.line_coverage)
             
             # Calculate branch coverage differences
-            buggy_branches = set(buggy.branch_coverage.items())
-            patched_branches = set(patched.branch_coverage.items())
+            buggy_branches = set(buggy.branch_decisions)
+            patched_branches = set(patched.branch_decisions)
             
             # Calculate method call differences
             buggy_methods = set(buggy.method_calls)
@@ -312,24 +318,24 @@ class PatchVerificationAgent:
                     'common': list(buggy_lines & patched_lines)
                 },
                 'branch_coverage': {
-                    'added': [f"{src}-{dst}" for (src, dst), _ in (patched_branches - buggy_branches)],
-                    'removed': [f"{src}-{dst}" for (src, dst), _ in (buggy_branches - patched_branches)],
-                    'changed': [
-                        f"{src}-{dst}: {buggy.branch_coverage.get((src, dst))} -> {patched.branch_coverage.get((src, dst))}"
-                        for (src, dst), _ in (buggy_branches & patched_branches)
-                        if buggy.branch_coverage.get((src, dst)) != patched.branch_coverage.get((src, dst))
-                    ]
+                    'added': [f"{line}-{decision}" for (line, decision) in (patched_branches - buggy_branches)],
+                    'removed': [f"{line}-{decision}" for (line, decision) in (buggy_branches - patched_branches)],
+                    'changed': []
                 },
                 'method_calls': {
                     'added': list(patched_methods - buggy_methods),
                     'removed': list(buggy_methods - patched_methods)
                 },
+                'exceptions_diff': {
+                    'added': list(set(patched.exceptions) - set(buggy.exceptions)),
+                    'removed': list(set(buggy.exceptions) - set(patched.exceptions))
+                },
                 'execution_time_diff': patched.execution_time - buggy.execution_time,
                 'memory_usage_diff': patched.memory_usage - buggy.memory_usage
             }
             
-            # Calculate a simple effectiveness score (0.0 to 1.0)
-            # This is a simplified version - can be enhanced based on specific requirements
+            # Calculate effectiveness score based on Equation (8) implementation
+            # Score is based on trace differences: Δ_trace = Trace(P_f, t_j) - Trace(P_b, t_j)
             score = 0.0
             
             # Reward for covering new lines/branches
@@ -337,7 +343,21 @@ class PatchVerificationAgent:
                 score += 0.3
             if diff['branch_coverage']['added']:
                 score += 0.3
+            
+            # Reward for new method calls (indicates new functionality)
+            if diff['method_calls']['added']:
+                score += 0.2
                 
+            # Penalize for removed coverage (regression)
+            if diff['line_coverage']['removed']:
+                score -= 0.1
+            if diff['branch_coverage']['removed']:
+                score -= 0.1
+            
+            # Penalize for new exceptions (potential bugs)
+            if diff['exceptions_diff']['added']:
+                score -= 0.2
+            
             # Penalize for performance regression
             if diff['execution_time_diff'] > 1.0:  # More than 1 second slower
                 score -= 0.1
