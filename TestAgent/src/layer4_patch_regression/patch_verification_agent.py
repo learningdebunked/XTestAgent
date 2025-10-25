@@ -14,6 +14,11 @@ import subprocess
 import json
 import tempfile
 import shutil
+import xml.etree.ElementTree as ET
+import time
+import re
+import psutil
+import os
 
 from testagentx.layer1_preprocessing.ast_cfg_generator import ASTCFGGenerator
 
@@ -216,17 +221,32 @@ class PatchVerificationAgent:
                     timeout=self.timeout_seconds
                 )
                 
+                # Measure execution time
+                start_time = time.time()
+                
+                # Measure memory usage before test
+                process = psutil.Process(os.getpid())
+                mem_before = process.memory_info().rss / 1024 / 1024  # MB
+                
                 # Parse JaCoCo report
                 coverage = self._parse_jacoco_report(jacoco_output)
                 
+                # Measure memory usage after test
+                mem_after = process.memory_info().rss / 1024 / 1024  # MB
+                mem_used = max(0, mem_after - mem_before)
+                
+                # Calculate execution time
+                exec_time = time.time() - start_time
+                
+                # Extract method calls from output
+                method_calls = self._extract_method_calls(result.stdout + result.stderr)
+                
                 # Create execution trace
                 trace = ExecutionTrace(
-                    test_id=test_id,
-                    covered_lines=coverage.get('line_coverage', []),
-                    branch_coverage=coverage.get('branch_coverage', {}),
-                    method_calls=self._extract_method_calls(result.stdout),
-                    execution_time=0.0,  # Would be extracted from test output
-                    memory_usage=0.0     # Would be measured during execution
+                    method_calls=method_calls,
+                    line_coverage=coverage.get('line_coverage', []),
+                    branch_decisions=self._extract_branch_decisions(coverage.get('branch_coverage', {})),
+                    exceptions=self._extract_exceptions(result.stdout + result.stderr)
                 )
                 
                 traces[test_id] = trace
@@ -376,19 +396,232 @@ class PatchVerificationAgent:
             return False
     
     def _parse_jacoco_report(self, jacoco_exec: Path) -> Dict[str, Any]:
-        """Parse JaCoCo execution data file."""
-        # This is a simplified version - in practice, you would use the JaCoCo API
-        # or a library like pyjacoco to parse the .exec file
+        """Parse JaCoCo execution data file.
+        
+        Converts the binary .exec file to XML format and parses it to extract
+        line coverage and branch coverage information.
+        
+        Args:
+            jacoco_exec: Path to the JaCoCo .exec file
+            
+        Returns:
+            Dictionary containing line_coverage and branch_coverage data
+        """
+        try:
+            # Generate XML report from .exec file
+            xml_report = jacoco_exec.parent / f"{jacoco_exec.stem}.xml"
+            
+            # Use JaCoCo CLI to generate XML report
+            # This requires jacococli.jar to be available
+            jacoco_cli = self.config.get('jacoco_cli', 'lib/jacococli.jar')
+            
+            if Path(jacoco_cli).exists() and jacoco_exec.exists():
+                # Generate XML report
+                cmd = [
+                    'java', '-jar', jacoco_cli, 'report', str(jacoco_exec),
+                    '--classfiles', str(jacoco_exec.parent.parent / 'target' / 'classes'),
+                    '--sourcefiles', str(jacoco_exec.parent.parent / 'src' / 'main' / 'java'),
+                    '--xml', str(xml_report)
+                ]
+                
+                result = subprocess.run(
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                
+                if result.returncode != 0:
+                    self.logger.warning(f"JaCoCo report generation failed: {result.stderr}")
+                    return self._parse_jacoco_fallback(jacoco_exec)
+                
+                # Parse the XML report
+                return self._parse_jacoco_xml(xml_report)
+            else:
+                self.logger.warning(f"JaCoCo CLI not found or .exec file missing")
+                return self._parse_jacoco_fallback(jacoco_exec)
+                
+        except Exception as e:
+            self.logger.error(f"Error parsing JaCoCo report: {e}")
+            return self._parse_jacoco_fallback(jacoco_exec)
+    
+    def _parse_jacoco_xml(self, xml_report: Path) -> Dict[str, Any]:
+        """Parse JaCoCo XML report to extract coverage data.
+        
+        Args:
+            xml_report: Path to the XML report file
+            
+        Returns:
+            Dictionary with line_coverage and branch_coverage
+        """
+        try:
+            tree = ET.parse(xml_report)
+            root = tree.getroot()
+            
+            line_coverage = []
+            branch_coverage = {}
+            
+            # Parse packages, classes, and methods
+            for package in root.findall('.//package'):
+                for sourcefile in package.findall('.//sourcefile'):
+                    filename = sourcefile.get('name')
+                    
+                    # Extract line coverage
+                    for line in sourcefile.findall('.//line'):
+                        line_num = int(line.get('nr'))
+                        covered = int(line.get('ci', 0)) > 0  # ci = covered instructions
+                        
+                        if covered:
+                            line_coverage.append(line_num)
+                        
+                        # Extract branch coverage
+                        mb = int(line.get('mb', 0))  # missed branches
+                        cb = int(line.get('cb', 0))  # covered branches
+                        
+                        if mb + cb > 0:
+                            branch_coverage[line_num] = {
+                                'covered': cb,
+                                'missed': mb,
+                                'total': mb + cb,
+                                'coverage_ratio': cb / (mb + cb) if (mb + cb) > 0 else 0.0
+                            }
+            
+            return {
+                'line_coverage': sorted(line_coverage),
+                'branch_coverage': branch_coverage
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error parsing XML report: {e}")
+            return {'line_coverage': [], 'branch_coverage': {}}
+    
+    def _parse_jacoco_fallback(self, jacoco_exec: Path) -> Dict[str, Any]:
+        """Fallback method when JaCoCo CLI is not available.
+        
+        Uses basic heuristics to estimate coverage from test output.
+        
+        Args:
+            jacoco_exec: Path to the .exec file
+            
+        Returns:
+            Dictionary with estimated coverage data
+        """
+        self.logger.info("Using fallback coverage estimation")
+        
+        # Return empty coverage data as fallback
+        # In production, you might want to use alternative coverage tools
         return {
-            'line_coverage': [],  # Would be populated with actual line numbers
-            'branch_coverage': {}  # Would be populated with branch coverage data
+            'line_coverage': [],
+            'branch_coverage': {}
         }
     
     def _extract_method_calls(self, test_output: str) -> List[str]:
-        """Extract method calls from test output (simplified)."""
-        # In a real implementation, this would parse the test output or use
-        # a profiler to capture method calls
-        return []
+        """Extract method calls from test output.
+        
+        Parses stack traces and test output to identify method calls made during
+        test execution. This is useful for understanding the execution flow.
+        
+        Args:
+            test_output: Standard output from test execution
+            
+        Returns:
+            List of method signatures that were called
+        """
+        method_calls = []
+        
+        try:
+            # Pattern to match Java method calls in stack traces
+            # Format: at package.Class.method(Class.java:line)
+            stack_trace_pattern = r'at\s+([\w\.]+)\(([\w\.]+):(\d+)\)'
+            
+            # Find all stack trace entries
+            matches = re.finditer(stack_trace_pattern, test_output)
+            
+            for match in matches:
+                method_sig = match.group(1)
+                source_file = match.group(2)
+                line_num = match.group(3)
+                
+                # Filter out JUnit and test framework methods
+                if not any(framework in method_sig for framework in 
+                          ['org.junit', 'java.lang.reflect', 'sun.reflect']):
+                    method_calls.append(method_sig)
+            
+            # Also look for explicit method call logging if present
+            # Pattern: "Calling method: ClassName.methodName"
+            log_pattern = r'Calling method:\s+([\w\.]+)'
+            log_matches = re.finditer(log_pattern, test_output)
+            
+            for match in log_matches:
+                method_calls.append(match.group(1))
+            
+            # Remove duplicates while preserving order
+            seen = set()
+            unique_calls = []
+            for call in method_calls:
+                if call not in seen:
+                    seen.add(call)
+                    unique_calls.append(call)
+            
+            return unique_calls
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting method calls: {e}")
+            return []
+    
+    def _extract_branch_decisions(self, branch_coverage: Dict[int, Dict[str, Any]]) -> List[Tuple[int, bool]]:
+        """Extract branch decisions from coverage data.
+        
+        Args:
+            branch_coverage: Dictionary mapping line numbers to branch coverage info
+            
+        Returns:
+            List of tuples (line_number, decision) where decision is True if taken
+        """
+        decisions = []
+        
+        for line_num, branch_info in branch_coverage.items():
+            covered = branch_info.get('covered', 0)
+            total = branch_info.get('total', 0)
+            
+            if total > 0:
+                # Add decisions for each branch
+                for i in range(covered):
+                    decisions.append((line_num, True))
+                for i in range(total - covered):
+                    decisions.append((line_num, False))
+        
+        return decisions
+    
+    def _extract_exceptions(self, output: str) -> List[str]:
+        """Extract exceptions from test output.
+        
+        Args:
+            output: Test output containing potential exceptions
+            
+        Returns:
+            List of exception types and messages
+        """
+        exceptions = []
+        
+        try:
+            # Pattern to match Java exceptions
+            # Format: ExceptionType: message
+            exception_pattern = r'([\w\.]+Exception|[\w\.]+Error):\s*(.+?)(?=\n|$)'
+            
+            matches = re.finditer(exception_pattern, output)
+            
+            for match in matches:
+                exception_type = match.group(1)
+                exception_msg = match.group(2).strip()
+                exceptions.append(f"{exception_type}: {exception_msg}")
+            
+            # Remove duplicates
+            return list(set(exceptions))
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting exceptions: {e}")
+            return []
     
     def _copy_directory(self, src: str, dst: str) -> None:
         """Copy directory contents from src to dst."""

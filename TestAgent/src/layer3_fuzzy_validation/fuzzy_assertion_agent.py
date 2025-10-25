@@ -141,7 +141,7 @@ class FuzzyAssertionAgent:
             
         Returns:
             Semantic similarity score (0.0 to 1.0)
-        ""
+        """
         # Use cosine similarity
         sim = util.pytorch_cos_sim(emb_buggy.unsqueeze(0), 
                                   emb_fixed.unsqueeze(0))
